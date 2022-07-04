@@ -11,10 +11,19 @@
 #include "error_codes.h"
 #include "util.h"
 
+constexpr uint8_t sign8 = 1 << 7;
+constexpr uint16_t sign16 = 1 << 15;
+constexpr uint8_t max8 = (uint8_t)0 - 1;
+constexpr uint16_t max16 = (uint16_t)0 - 1;
+
 // Temporary; there will be interruption here
 #define INVALID_INSTRUCTION \
 	std::wcout << L"Invalid instruction" << std::endl; \
 	std::exit(EError::ERROR)
+
+#define ONE one(first, f_size, next)
+#define TWO two(first, second, f_size, s_size, next)
+#define TWO_SAME two_same(first, second, f_size, next)
 
 void free()
 {
@@ -104,10 +113,10 @@ int main(int argc, char** argv)
 		}
 		case 0x01: // MOV
 		{
-			*SYS = two_same(first, second, f_size, next);
+			*SYS = TWO_SAME;
 			if (first && second &&
-				(next & 0b0011'0000 != 0b0001'0000) &&		// First cannot be value
-				(next & 0b1111'0000 != 0b1111'0000))		// First and second cannot both be memory
+				((next & 0b0011'0000) != 0b0001'0000) &&		// First cannot be value
+				((next & 0b1111'0000) != 0b1111'0000))		// First and second cannot both be memory
 			{
 				if (f_size == 1)
 				{
@@ -128,11 +137,11 @@ int main(int argc, char** argv)
 		}
 		case 0x02: // CHG
 		{
-			*SYS = two_same(first, second, f_size, next);
+			*SYS = TWO_SAME;
 			if (first && second &&
-				(next & 0b0011'0000 != 0b0001'0000) &&		// First cannot be value
-				(next & 0b1100'0000 != 0b0100'0000) &&		// Second cannot be value
-				(next & 0b1111'0000 != 0b1111'0000))		// First and second cannot both be memory
+				((next & 0b0011'0000) != 0b0001'0000) &&		// First cannot be value
+				((next & 0b1100'0000) != 0b0100'0000) &&		// Second cannot be value
+				((next & 0b1111'0000) != 0b1111'0000))		// First and second cannot both be memory
 			{
 				if (f_size == 1)
 				{
@@ -153,8 +162,8 @@ int main(int argc, char** argv)
 		}
 		case 0x03: // PUSH / POP
 		{
-			*SYS = one(first, f_size, next);
-			if (next & 0b0011'0011 == 0b0000'0001) // PUSHF / POPF
+			*SYS = ONE;
+			if ((next & 0b0011'0011) == 0b0000'0001) // PUSHF / POPF
 			{
 				first = FLAGSL;
 				f_size = 2;
@@ -164,7 +173,7 @@ int main(int argc, char** argv)
 			{
 			case 0b0000'0000: // PUSH
 			{
-				if (next & 0b0011'0011 == 0b0000'0000) // PUSHA
+				if ((next & 0b0011'0011) == 0b0000'0000) // PUSHA
 				{
 					for (int i = 0; i < 32; i++)
 					{
@@ -192,7 +201,7 @@ int main(int argc, char** argv)
 			}
 			case 0b1000'0000: // POP
 			{
-				if (next & 0b0011'0011 == 0b0000'0000) // POPA
+				if ((next & 0b0011'0011) == 0b0000'0000) // POPA
 				{
 					uint16_t SP_t = *SP;
 					for (int i = 0; i < 32; i++)
@@ -202,7 +211,7 @@ int main(int argc, char** argv)
 					*SP = SP_t - 32;
 				}
 				else if (first && // POP
-					(next & 0b0011'0000 != 0b0001'0000))		// First cannot be value
+					((next & 0b0011'0000) != 0b0001'0000))		// First cannot be value
 				{
 					if (f_size == 1)
 					{
@@ -227,6 +236,97 @@ int main(int argc, char** argv)
 			}
 			*IP = *SYS;
 			break;
+		}
+		case 0x04: // NEG / INC / DEC
+		{
+			*SYS = ONE;
+			if (first)
+			{
+				switch (next & 0b1110'1110)
+				{
+				case 0010'0000: // NEG
+				{
+					if (f_size == 1)
+					{
+						*first = (uint8_t)0 - *first;
+
+						F->PF = *first & 0b0001;
+						F->ZF = *first == 0;
+						F->SF = *first & sign8;
+					}
+					else
+					{
+						*(uint16_t*)first = (uint16_t)0 - *(uint16_t*)first;
+
+						F->PF = *first & 0b0001;
+						F->ZF = first[0] == 0 && first[1] == 0;
+						F->SF = first[1] & sign8;
+					}
+					break;
+				}
+				case 1010'0000: // INC
+				{
+					if (f_size == 1)
+					{
+						(*first)++;
+
+						F->CF = *first == 0;
+						F->PF = *first & 0b0001;
+						F->AF = (*first & 0b0001'1111) == 0b0001'0000;
+						F->ZF = F->CF;
+						F->SF = *first & sign8;
+						F->OF = (*first & sign8) == sign8;
+					}
+					else
+					{
+						(*(uint16_t*)first)++;
+
+						F->CF = first[0] == 0 && first[1] == 0;
+						F->PF = *first & 0b0001;
+						F->AF = (*first & 0b0001'1111) == 0b0001'0000;
+						F->ZF = F->CF;
+						F->SF = first[1] & sign8;
+						F->OF = (*(uint16_t*)first & sign16) == sign16;
+					}
+					break;
+				}
+				case 1110'0000: // DEC
+				{
+					if (f_size == 1)
+					{
+						(*first)--;
+
+						F->CF = *first == 0b1111'1111;
+						F->PF = *first & 0b0001;
+						F->AF = (*first & 0b0001'1111) == 0b0000'1111;
+						F->ZF = *first == 0;
+						F->SF = *first & sign8;
+						F->OF = (*first & sign8) == sign8;
+					}
+					else
+					{
+						(*(uint16_t*)first)++;
+
+						F->CF = first[0] == 0 && first[1] == 0;
+						F->PF = *first & 0b0001;
+						F->AF = (*first & 0b0001'1111) == 0b0001'0000;
+						F->ZF = F->CF;
+						F->SF = first[1] & sign8;
+						F->OF = (*(uint16_t*)first & sign16) == sign16;
+					}
+					break;
+				}
+				default:
+				{
+					INVALID_INSTRUCTION;
+				}
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
 		}
 		}
 	}

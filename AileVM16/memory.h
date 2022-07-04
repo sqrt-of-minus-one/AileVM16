@@ -11,7 +11,7 @@ void* ins_reg = new uint8_t[2]{}; // Instruction pointer register
 void* flags = new uint8_t[2]{ 0b01000000, 0b00000000 }; // Flags register
 void* sys_reg = new uint8_t[2]{}; // System registers
 void* memory;
-uint16_t memory_size;
+uint32_t memory_size;
 
 uint16_t* AX = (uint16_t*)gen_reg;
 uint16_t* BX = AX + 1;
@@ -75,25 +75,25 @@ uint8_t* MEM;
 
 struct FlagsType
 {
-	bool CF : 1;
+	bool CF : 1; // Carry
 	bool F1 : 1;
-	bool PF : 1;
+	bool PF : 1; // Parity
 	bool F3 : 1;
-	bool AF : 1;
+	bool AF : 1; // Auxiliary Carry
 	bool F5 : 1;
-	bool ZF : 1;
-	bool SF : 1;
+	bool ZF : 1; // Zero
+	bool SF : 1; // Sign
 
 	bool F8 : 1;
 	bool F9 : 1;
 	bool FA : 1;
-	bool OF : 1;
+	bool OF : 1; // Overflow
 	bool FC : 1;
 	bool FD : 1;
 	bool FE : 1;
 	bool FF : 1;
 };
-FlagsType* FLAGSB = (FlagsType*)flags;
+FlagsType* F = (FlagsType*)flags;
 
 enum EFlags
 {
