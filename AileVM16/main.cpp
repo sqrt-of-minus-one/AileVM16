@@ -89,6 +89,9 @@ int main(int argc, char** argv)
 	}
 	file.close();
 
+	uint8_t* first;
+	uint8_t* second;
+	uint8_t f_size, s_size;
 	while (true)
 	{
 		uint8_t next = MEM[*IP + 1];
@@ -101,7 +104,129 @@ int main(int argc, char** argv)
 		}
 		case 0x01: // MOV
 		{
-			
+			*SYS = two_same(first, second, f_size, next);
+			if (first && second &&
+				(next & 0b0011'0000 != 0b0001'0000) &&		// First cannot be value
+				(next & 0b1111'0000 != 0b1111'0000))		// First and second cannot both be memory
+			{
+				if (f_size == 1)
+				{
+					*first = *second;
+				}
+				else
+				{
+					first[0] = second[0];
+					first[1] = second[1];
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x02: // CHG
+		{
+			*SYS = two_same(first, second, f_size, next);
+			if (first && second &&
+				(next & 0b0011'0000 != 0b0001'0000) &&		// First cannot be value
+				(next & 0b1100'0000 != 0b0100'0000) &&		// Second cannot be value
+				(next & 0b1111'0000 != 0b1111'0000))		// First and second cannot both be memory
+			{
+				if (f_size == 1)
+				{
+					std::swap(*first, *second);
+				}
+				else
+				{
+					std::swap(first[0], second[0]);
+					std::swap(first[1], second[1]);
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x03: // PUSH / POP
+		{
+			*SYS = one(first, f_size, next);
+			if (next & 0b0011'0011 == 0b0000'0001) // PUSHF / POPF
+			{
+				first = FLAGSL;
+				f_size = 2;
+			}
+
+			switch (next & 0b1100'1100)
+			{
+			case 0b0000'0000: // PUSH
+			{
+				if (next & 0b0011'0011 == 0b0000'0000) // PUSHA
+				{
+					for (int i = 0; i < 32; i++)
+					{
+						MEM[*SP + 1 + i] = AL[i];
+					}
+					*SP += 32;
+				}
+				else if (first) // PUSH
+				{
+					if (f_size == 1)
+					{
+						MEM[++(*SP)] = *first;
+					}
+					else
+					{
+						MEM[++(*SP)] = first[0];
+						MEM[++(*SP)] = first[1];
+					}
+				}
+				else
+				{
+					INVALID_INSTRUCTION;
+				}
+				break;
+			}
+			case 0b1000'0000: // POP
+			{
+				if (next & 0b0011'0011 == 0b0000'0000) // POPA
+				{
+					uint16_t SP_t = *SP;
+					for (int i = 0; i < 32; i++)
+					{
+						AL[i] = MEM[SP_t - 31 + i];
+					}
+					*SP = SP_t - 32;
+				}
+				else if (first && // POP
+					(next & 0b0011'0000 != 0b0001'0000))		// First cannot be value
+				{
+					if (f_size == 1)
+					{
+						*first = MEM[(*SP)--];
+					}
+					else
+					{
+						first[0] = MEM[(*SP)--];
+						first[1] = MEM[(*SP)--];
+					}
+				}
+				else
+				{
+					INVALID_INSTRUCTION;
+				}
+				break;
+			}
+			default:
+			{
+				INVALID_INSTRUCTION;
+			}
+			}
+			*IP = *SYS;
+			break;
 		}
 		}
 	}
