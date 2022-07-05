@@ -24,6 +24,14 @@ constexpr uint16_t max16 = (uint16_t)0 - 1;
 #define ONE one(first, f_size, next)
 #define TWO two(first, second, f_size, s_size, next)
 #define TWO_SAME two_same(first, second, f_size, next)
+#define SET_FLAGS_8(pointer) \
+	F->PF = *(pointer) & 0b0001; \
+	F->ZF = *(pointer) == 0; \
+	F->SF = *(pointer) & sign8
+#define SET_FLAGS_16(pointer) \
+	F->PF = *(pointer) & 0b0001; \
+	F->ZF = (pointer)[0] == 0 && (pointer)[1] == 0; \
+	F->SF = (pointer)[1] & sign16
 
 void free()
 {
@@ -250,17 +258,13 @@ int main(int argc, char** argv)
 					{
 						*first = (uint8_t)0 - *first;
 
-						F->PF = *first & 0b0001;
-						F->ZF = *first == 0;
-						F->SF = *first & sign8;
+						SET_FLAGS_8(first);
 					}
 					else
 					{
 						*(uint16_t*)first = (uint16_t)0 - *(uint16_t*)first;
 
-						F->PF = *first & 0b0001;
-						F->ZF = first[0] == 0 && first[1] == 0;
-						F->SF = first[1] & sign8;
+						SET_FLAGS_16(first);
 					}
 					break;
 				}
@@ -270,22 +274,18 @@ int main(int argc, char** argv)
 					{
 						(*first)++;
 
+						SET_FLAGS_8(first);
 						F->CF = *first == 0;
-						F->PF = *first & 0b0001;
 						F->AF = (*first & 0b0001'1111) == 0b0001'0000;
-						F->ZF = F->CF;
-						F->SF = *first & sign8;
 						F->OF = (*first & sign8) == sign8;
 					}
 					else
 					{
 						(*(uint16_t*)first)++;
 
+						SET_FLAGS_16(first);
 						F->CF = first[0] == 0 && first[1] == 0;
-						F->PF = *first & 0b0001;
 						F->AF = (*first & 0b0001'1111) == 0b0001'0000;
-						F->ZF = F->CF;
-						F->SF = first[1] & sign8;
 						F->OF = (*(uint16_t*)first & sign16) == sign16;
 					}
 					break;
@@ -296,23 +296,19 @@ int main(int argc, char** argv)
 					{
 						(*first)--;
 
-						F->CF = *first == 0b1111'1111;
-						F->PF = *first & 0b0001;
+						SET_FLAGS_8(first);
+						F->CF = *first == max8;
 						F->AF = (*first & 0b0001'1111) == 0b0000'1111;
-						F->ZF = *first == 0;
-						F->SF = *first & sign8;
-						F->OF = (*first & sign8) == sign8;
+						F->OF = *first == (max8 ^ sign8);
 					}
 					else
 					{
 						(*(uint16_t*)first)++;
 
-						F->CF = first[0] == 0 && first[1] == 0;
-						F->PF = *first & 0b0001;
+						SET_FLAGS_16(first);
+						F->CF = first[0] == max8 && first[1] == max8;
 						F->AF = (*first & 0b0001'1111) == 0b0001'0000;
-						F->ZF = F->CF;
-						F->SF = first[1] & sign8;
-						F->OF = (*(uint16_t*)first & sign16) == sign16;
+						F->OF = (*(uint16_t*)first) == (max16 ^ sign16);
 					}
 					break;
 				}
@@ -327,6 +323,141 @@ int main(int argc, char** argv)
 				INVALID_INSTRUCTION;
 			}
 			*IP = *SYS;
+			break;
+		}
+		case 0x05: // ADD / ADC
+		{
+			bool carry = false;
+			if (next & 0b0010'0000) // ADC
+			{
+				carry = F->CF;
+				next &= 0b1101'1111;
+			}
+			*SYS = TWO;
+
+			if (first && second &&
+				f_size >= s_size &&								// First size cannot be less than second size
+				((next & 0b0011'0000) != 0b0001'0000) &&		// First cannot be value
+				((next & 0b1111'0000) != 0b1111'0000))			// First and second cannot both be memory
+			{
+				if (f_size == 1)
+				{
+					uint8_t tmp1 = *first;
+					uint8_t tmp2 = *second + carry;
+					*first += tmp2;
+
+					SET_FLAGS_8(first);
+					F->CF = (*second == max8 && carry) || (max8 - tmp2 < tmp1);
+					F->AF = ((tmp1 ^ tmp2) & 0b0001'0000) != (*first & 0b0001'0000);
+					F->OF = ((tmp1 ^ tmp2) & sign8) != (*first & sign8);
+				}
+				else
+				{
+					uint16_t* first16 = (uint16_t*)first;
+					uint16_t* second16 = (uint16_t*)second;
+
+					uint16_t tmp1 = *first16;
+					uint16_t tmp2 = *second16 + carry;
+					*first16 += tmp2;
+
+					SET_FLAGS_16(first);
+					F->CF = (*second16 == max16 && carry) || (max16 - tmp2 < tmp1);
+					F->AF = ((tmp1 ^ tmp2) & 0b0001'0000) != (*first16 & 0b0001'0000);
+					F->OF = ((tmp1 ^ tmp2) & sign16) != (*first16 & sign16);
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x06: // SUB / SBB
+		{
+			bool carry = false;
+			if (next & 0b0010'0000) // SBB
+			{
+				carry = F->CF;
+				next &= 0b1101'1111;
+			}
+			*SYS = TWO;
+
+			if (first && second &&
+				f_size >= s_size &&								// First size cannot be less than second size
+				((next & 0b0011'0000) != 0b0001'0000) &&		// First cannot be value
+				((next & 0b1111'0000) != 0b1111'0000))			// First and second cannot both be memory
+			{
+				if (f_size == 1)
+				{
+					uint8_t tmp1 = *first;
+					uint8_t tmp2 = *second + carry;
+					*first -= tmp2;
+
+					SET_FLAGS_8(first);
+					F->CF = (*second == max8 && carry) || (tmp1 < tmp2);
+					F->AF = ((tmp1 ^ tmp2) & 0b0001'0000) != (*first & 0b0001'0000);
+					F->OF = ((tmp1 ^ tmp2) & sign8) != (*first & sign8);
+				}
+				else
+				{
+					uint16_t* first16 = (uint16_t*)first;
+					uint16_t* second16 = (uint16_t*)second;
+
+					uint16_t tmp1 = *first16;
+					uint16_t tmp2 = *second16 + carry;
+					*first16 -= tmp2;
+
+					SET_FLAGS_16(first);
+					F->CF = (*second16 == max16 && carry) || (tmp1 < tmp2);
+					F->AF = ((tmp1 ^ tmp2) & 0b0001'0000) != (*first16 & 0b0001'0000);
+					F->OF = ((tmp1 ^ tmp2) & sign16) != (*first16 & sign16);
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x07: // CMP
+		{
+			*SYS = TWO;
+
+			if (first && second &&
+				f_size >= s_size &&								// First size cannot be less than second size
+				((next & 0b0011'0000) != 0b0001'0000) &&		// First cannot be value
+				((next & 0b1111'0000) != 0b1111'0000))			// First and second cannot both be memory
+			{
+				if (f_size == 1)
+				{
+					uint8_t tmp = *first - *second;
+
+					SET_FLAGS_8(&tmp);
+					F->CF = *first < *second;
+					F->AF = ((*first ^ *second) & 0b0001'0000) != (tmp & 0b0001'0000);
+					F->OF = ((*first ^ *second) & sign8) != (tmp & sign8);
+				}
+				else
+				{
+					uint16_t* first16 = (uint16_t*)first;
+					uint16_t* second16 = (uint16_t*)second;
+
+					uint16_t tmp = *first16 - *second16;
+
+					SET_FLAGS_16((int8_t*)(&tmp));
+					F->CF = *first16 < *second16;
+					F->AF = ((*first16 ^ *second16) & 0b0001'0000) != (tmp & 0b0001'0000);
+					F->OF = ((*first16 ^ *second16) & sign16) != (tmp & sign16);
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
 		}
 		}
 	}
