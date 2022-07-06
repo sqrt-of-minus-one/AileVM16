@@ -811,6 +811,43 @@ int main(int argc, char** argv)
 			*IP = *SYS;
 			break;
 		}
+		case 0x0F: // NC / RC / SC / MOVAF / MOVFA
+		{
+			switch (next)
+			{
+			case 0x00: // NC
+			{
+				F->CF = !F->CF;
+				break;
+			}
+			case 0x01: // RC
+			{
+				F->CF = false;
+				break;
+			}
+			case 0x02: // SC
+			{
+				F->CF = true;
+				break;
+			}
+			case 0x03: // MOVAF
+			{
+				*AH = *FLAGSL;
+				break;
+			}
+			case 0x04: // MOVFA
+			{
+				*FLAGSL = *AH & 0b1101'0111 | 0b0000'0010;
+				break;
+			}
+			default:
+			{
+				INVALID_INSTRUCTION;
+			}
+			}
+			(*IP) += 2;
+			break;
+		}
 		case 0x10: // SHL / SHR
 		{
 			bool right = (next & 0b0010'0000) == 0b0000'0000; // SHR or SHL
@@ -1210,6 +1247,24 @@ int main(int argc, char** argv)
 			}
 			break;
 		}
+		case 0x1E: // INx
+		{
+
+		}
+		case 0x1F: // OUTx
+		{
+
+		}
+		case 0x20: // EXIT
+		{
+			std::exit(EError::OK);
+			break;
+		}
+		default:
+		{
+			INVALID_INSTRUCTION;
+		}
 		}
 	}
+	std::exit(EError::OK);
 }
