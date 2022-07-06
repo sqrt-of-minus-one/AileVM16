@@ -1083,6 +1083,133 @@ int main(int argc, char** argv)
 			*IP = *SYS;
 			break;
 		}
+		case 0x14: // JMP / CALL / RET
+		{
+			uint8_t r_next = next;
+			next &= 0b0011'0011;
+			*SYS = ONE;
+			switch (next & 0b1100'1100)
+			{
+			case 0b1100'0000: // RET
+			{
+				uint16_t addr = *(uint16_t*)(MEM + *SP - 1);
+				*SP -= 2;
+				break;
+			}
+			case 0b1000'0000: // CALL
+			{
+				MEM[++(*SP)] = SYS[0];
+				MEM[++(*SP)] = SYS[1];
+				[[fallthrough]];
+			}
+			case 0b0000'0000: // JMP
+			{
+				if (first)
+				{
+					*IP = (f_size == 1 ? *first : *(uint16_t*)first);
+				}
+				else
+				{
+					INVALID_INSTRUCTION;
+				}
+				break;
+			}
+			default:
+			{
+				INVALID_INSTRUCTION;
+			}
+			}
+		}
+		
+#define JUMP_IF(cond)											\
+	bool f = (next & 0b1000'0000) == 0b0000'0000;				\
+	next &= 0b1000'0000;										\
+	*SYS = ONE;													\
+	if (first &&												\
+		(next & 0b0100'1100) == 0b0000'0000)					\
+	{															\
+		if ((cond) ^ f)											\
+		{														\
+			*IP = (f_size == 1 ? *first : *(uint16_t*)first);	\
+		}														\
+		else													\
+		{														\
+			*IP = *SYS;											\
+		}														\
+	}															\
+	else														\
+	{															\
+		INVALID_INSTRUCTION;									\
+	}
+
+		case 0x15: // JZ=JE / JNZ=JNE
+		{
+			JUMP_IF(F->ZF);
+			break;
+		}
+		case 0x16: // JC=JNAE=JB / JNC=JAE=JNB
+		{
+			JUMP_IF(F->CF);
+			break;
+		}
+		case 0x17: // JP / JNP
+		{
+			JUMP_IF(F->PF);
+			break;
+		}
+		case 0x18: // JS / JNS
+		{
+			JUMP_IF(F->SF);
+			break;
+		}
+		case 0x19: // JO / JNO
+		{
+			JUMP_IF(F->OF);
+			break;
+		}
+		case 0x1A: // JA=JNBE / JNA=JBE
+		{
+			JUMP_IF(!F->CF && !F->ZF);
+			break;
+		}
+		case 0x1B: // JG=JNLE / JLE=JNG
+		{
+			JUMP_IF(!F->ZF && F->SF == F->OF);
+			break;
+		}
+		case 0x1C: // JGE=JNL / JL=JNGE
+		{
+			JUMP_IF(F->SF == F->OF);
+			break;
+		}
+		case 0x1D: // JCZ / LOOP
+		{
+			bool f = (next & 0b1000'0000) == 0b0000'0000;
+			next &= 0b1000'0000;
+			*SYS = ONE;
+			if (first &&
+				(next & 0b0100'1100) == 0b0000'0000)
+			{
+				if (*CX == 0 ^ f)
+				{
+					*IP = (f_size == 1 ? *first : *(uint16_t*)first);
+				}
+				else
+				{
+					*IP = *SYS;
+				}
+
+				if (*CX != 0 && f)
+				{
+					(*CX)--;
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			break;
+		}
 		}
 	}
 }
