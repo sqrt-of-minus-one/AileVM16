@@ -32,5 +32,8 @@
     <ClInclude Include="in_out.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="test.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

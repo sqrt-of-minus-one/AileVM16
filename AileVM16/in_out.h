@@ -7,6 +7,8 @@
 #include <iostream>
 #include <mutex>
 
+bool is_work = true;
+
 constexpr uint16_t in_count = 16;
 constexpr uint16_t out_count = 16;
 
@@ -27,7 +29,7 @@ constexpr uint16_t IN_PRINT_SYNC = 0;
 void print()
 {
 	bool sync = false;
-	while (true)
+	while (is_work)
 	{
 		out_mtx.lock();
 		if (sync != OUT[OUT_PRINT_SYNC])

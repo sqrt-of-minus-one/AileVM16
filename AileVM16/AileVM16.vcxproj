@@ -133,6 +133,7 @@
     <ClInclude Include="error_codes.h" />
     <ClInclude Include="in_out.h" />
     <ClInclude Include="memory.h" />
+    <ClInclude Include="test.h" />
     <ClInclude Include="util.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
