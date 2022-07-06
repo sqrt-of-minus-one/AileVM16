@@ -4,12 +4,13 @@
  //  File: main.cpp                    //
 ////////////////////////////////////////
 
-#include <iostream>
 #include <fstream>
+#include <thread>
 
 #include "memory.h"
 #include "error_codes.h"
 #include "util.h"
+#include "in_out.h"
 
 constexpr uint8_t sign8 = 1 << 7;
 constexpr uint16_t sign16 = 1 << 15;
@@ -18,7 +19,7 @@ constexpr uint16_t max16 = (uint16_t)0 - 1;
 
 // Temporary; there will be interruption here
 #define INVALID_INSTRUCTION \
-	std::wcout << L"Invalid instruction" << std::endl; \
+	std::cout << "Invalid instruction" << std::endl; \
 	std::exit(EError::ERROR)
 
 #define ONE one(first, f_size, next)
@@ -50,20 +51,90 @@ int main(int argc, char** argv)
 #ifndef TEST
 	if (argc < 2)
 	{
-		std::wcout << L"Wrong number of arguments" << std::endl;
+		std::cout << "Wrong number of arguments" << std::endl;
 		std::exit(EError::WRONG_NUMBER_OF_ARGUMENTS);
 	}
 
 	memory_size = argc >= 3 ? std::stoi(argv[2]) : 65'536; // Memory size is stored in 2-nd argument
 	if (memory_size > 65'536)
 	{
-		std::wcout << L"The maximum memory size is 65536 bytes" << std::endl;
+		std::cout << "The maximum memory size is 65536 bytes" << std::endl;
 		std::exit(EError::WRONG_MEMORY_SIZE);
 	}
 	std::basic_ifstream<uint8_t> file(argv[1], std::ios::in | std::ios::binary); // The name of the file with binary program is stored in 1-st argument
 #else
 	std::basic_ofstream<uint8_t> out("test.lvm", std::ios::out | std::ios::binary);
-	out << (uint8_t)0x05 << (uint8_t)0x06 << (uint8_t)0x09 << (uint8_t)0xA6 << (uint8_t)0x00 << (uint8_t)0x9F;
+	out << (uint8_t)0x00 << (uint8_t)0xE0 <<													// Stack address
+/*00*/	(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x03 << (uint8_t)0x00 << (uint8_t)0x00 <<	// MOV DX, 0
+
+/*05*/	(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x01 << (uint8_t)'H'  <<	// MOV AX, 0x4801
+/*0A*/	(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*0C*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*0E*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*12*/	(uint8_t)0x15 << (uint8_t)0x10 << (uint8_t)0x0C <<										// JE 0x0C
+/*15*/	(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x00 << (uint8_t)0x00 <<	// MOV AX, 0
+/*1A*/	(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*1C*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*1E*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*22*/	(uint8_t)0x15 << (uint8_t)0x90 << (uint8_t)0x1C <<										// JNE 0x1C
+
+/*25*/	(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x01 << (uint8_t)'e'  <<	// MOV AX, 0x
+/*2A*/	(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*2C*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*2E*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*32*/	(uint8_t)0x15 << (uint8_t)0x10 << (uint8_t)0x2C <<										// JE 0x2C
+/*35*/	(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x00 << (uint8_t)0x00 <<	// MOV AX, 0
+/*3A*/	(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*3C*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*3E*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*42*/	(uint8_t)0x15 << (uint8_t)0x90 << (uint8_t)0x3C <<										// JNE 0x3C
+
+		(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x01 << (uint8_t)'l'  <<	// MOV AX, 0x
+		(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*4C*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*4E*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*52*/	(uint8_t)0x15 << (uint8_t)0x10 << (uint8_t)0x4C <<										// JE 0x4C
+		(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x00 << (uint8_t)0x00 <<	// MOV AX, 0
+		(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*5C*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*5E*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*62*/	(uint8_t)0x15 << (uint8_t)0x90 << (uint8_t)0x5C <<										// JNE 0x5C
+
+		(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x01 << (uint8_t)'l'  <<	// MOV AX, 0x4801
+		(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*6C*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*6E*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*72*/	(uint8_t)0x15 << (uint8_t)0x10 << (uint8_t)0x6C <<										// JE 0x6C
+		(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x00 << (uint8_t)0x00 <<	// MOV AX, 0
+		(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*7C*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*7E*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*82*/	(uint8_t)0x15 << (uint8_t)0x90 << (uint8_t)0x7C <<										// JNE 0x7C
+
+		(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x01 << (uint8_t)'o'  <<	// MOV AX, 0x4801
+		(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*8C*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*8E*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*92*/	(uint8_t)0x15 << (uint8_t)0x10 << (uint8_t)0x8C <<										// JE 0x8C
+		(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x00 << (uint8_t)0x00 <<	// MOV AX, 0
+		(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*9C*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*9E*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*A2*/	(uint8_t)0x15 << (uint8_t)0x90 << (uint8_t)0x9C <<										// JNE 0x9C
+
+		(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x01 << (uint8_t)'!'  <<	// MOV AX, 0x4801
+		(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*AC*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*AE*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*B2*/	(uint8_t)0x15 << (uint8_t)0x10 << (uint8_t)0xAC <<										// JE 0xAC
+		(uint8_t)0x01 << (uint8_t)0x65 << (uint8_t)0x00 << (uint8_t)0x00 << (uint8_t)0x00 <<	// MOV AX, 0
+		(uint8_t)0x0F << (uint8_t)0x15 <<														// OUTW
+/*BC*/	(uint8_t)0x0F << (uint8_t)0x10 <<														// INB
+/*BE*/	(uint8_t)0x07 << (uint8_t)0x60 << (uint8_t)0x00 << (uint8_t)0x00 <<						// CMP AL, 0
+/*C2*/	(uint8_t)0x15 << (uint8_t)0x90 << (uint8_t)0xBC <<										// JNE 0xBC
+
+		(uint8_t)0x20;																			// EXIT
+
 	out.close();
 
 	memory_size = 65'536;
@@ -72,7 +143,7 @@ int main(int argc, char** argv)
 
 	if (!file.is_open())
 	{
-		std::wcout << L"The file does not exist or cannot be accessed" << std::endl;
+		std::cout << "The file does not exist or cannot be accessed" << std::endl;
 		std::exit(EError::NO_FILE);
 	}
 
@@ -94,17 +165,20 @@ int main(int argc, char** argv)
 			MEM[addr++] = byte;
 			if (addr >= memory_size - 3)
 			{
-				std::wcout << L"The program is out of memory" << std::endl;
+				std::cout << "The program is out of memory" << std::endl;
 				std::exit(EError::OUT_OF_MEMORY);
 			}
 		}
 
 		// The last three bytes are always jump to the beginning
-		MEM[memory_size - 3] = 0x10; // JMP byte 0
-		MEM[memory_size - 2] = 0x20;
-		MEM[memory_size - 1] = 0x00;
+		MEM[addr] = 0x14; // JMP byte 0
+		MEM[addr + 1] = 0x10;
+		MEM[addr + 2] = 0x00;
 	}
 	file.close();
+
+	std::thread print_th(&print);
+	print_th.detach();
 
 	uint8_t* first;
 	uint8_t* second;
@@ -811,7 +885,7 @@ int main(int argc, char** argv)
 			*IP = *SYS;
 			break;
 		}
-		case 0x0F: // NC / RC / SC / MOVAF / MOVFA
+		case 0x0F: // NC / RC / SC / MOVAF / MOVFA / INx / OUTx
 		{
 			switch (next)
 			{
@@ -838,6 +912,64 @@ int main(int argc, char** argv)
 			case 0x04: // MOVFA
 			{
 				*FLAGSL = *AH & 0b1101'0111 | 0b0000'0010;
+				break;
+			}
+			case 0x10: // INB
+			{
+				if (*DX < in_count)
+				{
+					in_mtx.lock();
+					*AL = IN[*DX];
+					in_mtx.unlock();
+				}
+				else
+				{
+					INVALID_INSTRUCTION;
+				}
+				break;
+			}
+			case 0x11: // INW
+			{
+				if (*DX < in_count - 1)
+				{
+					in_mtx.lock();
+					*AL = IN[*DX];
+					*AH = IN[*DX + 1];
+					in_mtx.unlock();
+				}
+				else
+				{
+					INVALID_INSTRUCTION;
+				}
+				break;
+			}
+			case 0x14: // OUTB
+			{
+				if (*DX < in_count)
+				{
+					out_mtx.lock();
+					OUT[*DX] = *AL;
+					out_mtx.unlock();
+				}
+				else
+				{
+					INVALID_INSTRUCTION;
+				}
+				break;
+			}
+			case 0x15: // OUTW
+			{
+				if (*DX < in_count - 1)
+				{
+					out_mtx.lock();
+					OUT[*DX] = *AL;
+					OUT[*DX + 1] = *AH;
+					out_mtx.unlock();
+				}
+				else
+				{
+					INVALID_INSTRUCTION;
+				}
 				break;
 			}
 			default:
@@ -1156,11 +1288,12 @@ int main(int argc, char** argv)
 				INVALID_INSTRUCTION;
 			}
 			}
+			break;
 		}
 		
 #define JUMP_IF(cond)											\
-	bool f = (next & 0b1000'0000) == 0b0000'0000;				\
-	next &= 0b1000'0000;										\
+	bool f = (next & 0b1000'0000) == 0b1000'0000;				\
+	next &= 0b0111'1111;										\
 	*SYS = ONE;													\
 	if (first &&												\
 		(next & 0b0100'1100) == 0b0000'0000)					\
@@ -1246,14 +1379,6 @@ int main(int argc, char** argv)
 				INVALID_INSTRUCTION;
 			}
 			break;
-		}
-		case 0x1E: // INx
-		{
-
-		}
-		case 0x1F: // OUTx
-		{
-
 		}
 		case 0x20: // EXIT
 		{

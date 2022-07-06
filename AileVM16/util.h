@@ -68,16 +68,19 @@ uint16_t two_(uint8_t*& out_first, uint8_t*& out_second, uint8_t& out_f_size, ui
 	{
 		out_first = MEM + *IP + 2;
 		first_instr_size = out_f_size;
+		break;
 	}
 	case 0b0010'0000: // Register
 	{
 		out_first = get_reg_addr_(MEM[*IP + 2]);
 		first_instr_size = 1;
+		break;
 	}
 	case 0b0011'0000: // Memory
 	{
 		out_first = MEM + *(uint16_t*)(MEM + *IP + 2);
 		first_instr_size = 2;
+		break;
 	}
 	default:
 	{
@@ -88,22 +91,25 @@ uint16_t two_(uint8_t*& out_first, uint8_t*& out_second, uint8_t& out_f_size, ui
 	}
 
 	// Second
-	switch (byte & 0b0011'0000)
+	switch (byte & 0b1100'0000)
 	{
 	case 0b0100'0000: // Value
 	{
-		out_first = MEM + *IP + 2 + first_instr_size;
+		out_second = MEM + *IP + 2 + first_instr_size;
 		return *IP + 2 + first_instr_size + out_s_size;
+		break;
 	}
 	case 0b1000'0000: // Register
 	{
-		out_first = get_reg_addr_(MEM[*IP + 2 + first_instr_size]);
+		out_second = get_reg_addr_(MEM[*IP + 2 + first_instr_size]);
 		return *IP + first_instr_size + 3;
+		break;
 	}
 	case 0b1100'0000: // Memory
 	{
-		out_first = MEM + *(uint16_t*)(MEM + *IP + 2 + first_instr_size);
+		out_second = MEM + *(uint16_t*)(MEM + *IP + 2 + first_instr_size);
 		return *IP + first_instr_size + 4;
+		break;
 	}
 	default:
 	{
@@ -130,16 +136,19 @@ uint16_t one(uint8_t*& out_first, uint8_t& out_f_size, uint8_t byte)
 	{
 		out_first = MEM + *IP + 2;
 		return *IP + 2 + out_f_size;
+		break;
 	}
 	case 0b0010'0000: // Register
 	{
 		out_first = get_reg_addr_(MEM[*IP + 2]);
 		return *IP + 3;
+		break;
 	}
 	case 0b0011'0000: // Memory
 	{
 		out_first = MEM + *(uint16_t*)(MEM + *IP + 2);
 		return *IP + 4;
+		break;
 	}
 	default:
 	{

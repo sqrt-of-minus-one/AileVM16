@@ -6,10 +6,10 @@
 
 #include <cstdint>
 
-void* gen_reg = new uint8_t[32]{}; // General-purpose registers
+void* gen_reg = new uint8_t[32] {}; // General-purpose registers
 void* ins_reg = new uint8_t[2]{}; // Instruction pointer register
-void* flags = new uint8_t[2]{ 0b01000000, 0b00000000 }; // Flags register
-void* sys_reg = new uint8_t[2]{}; // System registers
+void* flags = new uint8_t[2] { 0b01000000, 0b00000000 }; // Flags register
+void* sys_reg = new uint8_t[2] {}; // System registers
 void* memory;
 uint32_t memory_size;
 
@@ -31,7 +31,7 @@ uint16_t* R14W = AX + 14;
 uint16_t* R15W = AX + 15;
 uint16_t* IP = (uint16_t*)ins_reg;
 uint16_t* FLAGS = (uint16_t*)flags;
-uint16_t* SYS = (uint16_t*)SYS;
+uint16_t* SYS = (uint16_t*)sys_reg;
 
 uint8_t* AL = (uint8_t*)AX;
 uint8_t* BL = (uint8_t*)BX;
