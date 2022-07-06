@@ -617,6 +617,33 @@ int main(int argc, char** argv)
 			*IP = *SYS;
 			break;
 		}
+		case 0x0A: // NOT
+		{
+			*SYS = ONE;
+			if (first &&
+				(next & 0b1110'1100) == 0b0010'0000)
+			{
+				if (f_size == 1)
+				{
+					*first = ~*first;
+
+					SET_FLAGS_8(first);
+				}
+				else
+				{
+					*(uint16_t*)first = ~*(uint16_t*)first;
+
+					SET_FLAGS_16(first);
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x0B: //
 		}
 	}
 }
