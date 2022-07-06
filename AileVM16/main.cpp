@@ -459,6 +459,164 @@ int main(int argc, char** argv)
 			*IP = *SYS;
 			break;
 		}
+		case 0x08: // MUL / IMUL
+		{
+			*SYS = ONE;
+			if (first)
+			{
+				switch (next & 0b1100'1100)
+				{
+				case 0b0000'0000: // MUL
+				{
+					if (f_size == 1)
+					{
+						*AX = (uint16_t)*AL * *first;
+						SET_FLAGS_16(AL);
+						F->CF = *AH;
+						F->AF = false;
+						F->OF = *AH;
+					}
+					else
+					{
+						uint32_t tmp = (uint32_t)*AX * *(uint16_t*)first;
+						uint16_t* tmp_p = (uint16_t*)&tmp;
+						*AX = tmp_p[0];
+						*DX = tmp_p[1];
+						
+						F->PF = tmp & 0b0001;
+						F->ZF = tmp == 0;
+						F->SF = *DH & sign8;
+						F->CF = *DX;
+						F->AF = false;
+						F->OF = *DX;
+					}
+					break;
+				}
+				case 0b1000'0000: // IMUL
+				{
+					if (f_size == 1)
+					{
+						*(int16_t*)AX = (int16_t)*AL * *(int8_t*)first;
+						SET_FLAGS_16(AL);
+						F->CF = *AH;
+						F->AF = false;
+						F->OF = *AH;
+					}
+					else
+					{
+						int32_t tmp = (int32_t)*AX * *(int16_t*)first;
+						int16_t* tmp_p = (int16_t*)&tmp;
+						*(int16_t*)AX = tmp_p[0];
+						*(int16_t*)DX = tmp_p[1];
+
+						F->PF = tmp & 0b0001;
+						F->ZF = tmp == 0;
+						F->SF = *DH & sign8;
+						F->CF = *DX;
+						F->AF = false;
+						F->OF = *DX;
+					}
+					break;
+				}
+				default:
+				{
+					INVALID_INSTRUCTION;
+				}
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x09: // DIV / IDIV
+		{
+			*SYS = ONE;
+			if (first)
+			{
+				switch (next & 0b1100'1100)
+				{
+				case 0b0000'0000: // DIV
+				{
+					if (f_size == 1)
+					{
+						uint16_t tmp1 = *AX / *first;
+						uint8_t tmp2 = *AX % *first;
+
+						*AL = tmp1;
+						*AH = tmp2;
+
+						SET_FLAGS_8(AL);
+						F->CF = tmp1 > max8;
+						F->AF = false;
+						F->OF = tmp1 > max8;
+					}
+					else
+					{
+						uint32_t tmp0 = ((uint32_t)*DX << 16) + *AX;
+						uint32_t tmp1 = tmp0 / *(uint16_t*)first;
+						uint16_t tmp2 = tmp0 % *(uint16_t*)first;
+
+						*AX = tmp1;
+						*DX = tmp2;
+
+						F->PF = *AX & 0b0001;
+						F->ZF = *AX == 0;
+						F->SF = *AH & sign8;
+						F->CF = tmp1 > max16;
+						F->AF = false;
+						F->OF = tmp1 > max16;
+					}
+					break;
+				}
+				case 0b1000'0000: // IDIV
+				{
+					if (f_size == 1)
+					{
+						int16_t tmp1 = (int16_t)*AX / *(int8_t*)first;
+						int8_t tmp2 = (int16_t)*AX % *(int8_t*)first;
+
+						*(int8_t*)AL = tmp1;
+						*(int8_t*)AH = tmp2;
+
+						SET_FLAGS_8(AL);
+						F->CF = ((int8_t*)tmp1)[1] != max8;
+						F->AF = false;
+						F->OF = ((int8_t*)tmp1)[1] != max8;
+					}
+					else
+					{
+						int32_t tmp0 = ((uint32_t)*DX << 16) + *AX;
+						int32_t tmp1 = tmp0 / *(int16_t*)first;
+						int16_t tmp2 = tmp0 % *(int16_t*)first;
+
+						*(int16_t*)AX = tmp1;
+						*(int16_t*)DX = tmp2;
+
+						F->PF = *AX & 0b0001;
+						F->ZF = *AX == 0;
+						F->SF = *AH & sign8;
+						F->CF = ((int16_t*)tmp1)[1] != max16;
+						F->AF = false;
+						F->OF = ((int16_t*)tmp1)[1] != max16;
+					}
+					break;
+				}
+				default:
+				{
+					INVALID_INSTRUCTION;
+				}
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
 		}
 	}
 }
