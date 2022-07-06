@@ -124,7 +124,7 @@ int main(int argc, char** argv)
 			*SYS = TWO_SAME;
 			if (first && second &&
 				((next & 0b0011'0000) != 0b0001'0000) &&		// First cannot be value
-				((next & 0b1111'0000) != 0b1111'0000))		// First and second cannot both be memory
+				((next & 0b1111'0000) != 0b1111'0000))			// First and second cannot both be memory
 			{
 				if (f_size == 1)
 				{
@@ -643,7 +643,446 @@ int main(int argc, char** argv)
 			*IP = *SYS;
 			break;
 		}
-		case 0x0B: //
+		case 0x0B: // AND / TEST
+		{
+			bool test = (next & 0b0010'0000) == 0b0000'0000; // TEST or AND
+			next |= 0b0010'0000;
+			*SYS = TWO_SAME;
+			if (first && second)
+			{
+				if (f_size = 1)
+				{
+					uint8_t tmp = *first & *second;
+					if (!test)
+					{
+						*first = tmp;
+					}
+
+					SET_FLAGS_8(&tmp);
+				}
+				else
+				{
+					uint16_t tmp = *(uint16_t*)first & *(uint16_t*)second;
+					if (!test)
+					{
+						*(uint16_t*)first = tmp;
+					}
+
+					SET_FLAGS_16((uint8_t*)(&tmp));
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x0C: // OR / XOR
+		{
+			bool is_xor = (next & 0b0010'0000) == 0b0000'0000; // XOR or OR
+			next |= 0b0010'0000;
+			*SYS = TWO_SAME;
+			if (first && second)
+			{
+				if (f_size = 1)
+				{
+					if (is_xor)
+					{
+						*first ^= *second;
+					}
+					else
+					{
+						*first |= *second;
+					}
+
+					SET_FLAGS_8(first);
+				}
+				else
+				{
+					if (is_xor)
+					{
+						*(uint16_t*)first ^= *(uint16_t*)second;
+					}
+					else
+					{
+						*(uint16_t*)first |= *(uint16_t*)second;
+					}
+
+					SET_FLAGS_16(first);
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x0D: // BT / BTN
+		{
+			bool btn = (next & 0b0010'0000) == 0b0000'0000; // BTN or BT
+			next |= 0b0010'0000;
+			*SYS = TWO;
+			if (first && second &&
+				s_size != 1 &&									// Second size must be one byte
+				(next & 0b1100'0000) != 0b1100'0000 &&			// Second cannot be memory
+				*second < 8 * f_size)							// Second must be a number of first's bit
+			{
+				uint16_t mask = 1 << *second;
+				if (f_size = 1)
+				{
+					F->CF = *first & mask;
+					if (btn)
+					{
+						if (F->CF)
+						{
+							*first |= mask;
+						}
+						else
+						{
+							*first &= ~mask;
+						}
+					}
+				}
+				else
+				{
+					F->CF = *(uint16_t*)first & mask;
+					if (btn)
+					{
+						if (F->CF)
+						{
+							*(uint16_t*)first |= mask;
+						}
+						else
+						{
+							*(uint16_t*)first &= ~mask;
+						}
+					}
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x0E: // BTR / BTS
+		{
+			bool bts = (next & 0b0010'0000) == 0b0000'0000; // BTS or BTR
+			next |= 0b0010'0000;
+			*SYS = TWO;
+			if (first && second &&
+				s_size != 1 &&									// Second size must be one byte
+				(next & 0b1100'0000) != 0b1100'0000 &&			// Second cannot be memory
+				*second < 8 * f_size)							// Second must be a number of first's bit
+			{
+				uint16_t mask = 1 << *second;
+				if (f_size = 1)
+				{
+					F->CF = *first & mask;
+					if (bts)
+					{
+						*first |= mask;
+					}
+					else
+					{
+						*first &= ~mask;
+					}
+				}
+				else
+				{
+					F->CF = *(uint16_t*)first & mask;
+					if (bts)
+					{
+						*(uint16_t*)first |= mask;
+					}
+					else
+					{
+						*(uint16_t*)first &= ~mask;
+					}
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x10: // SHL / SHR
+		{
+			bool right = (next & 0b0010'0000) == 0b0000'0000; // SHR or SHL
+			next |= 0b0010'0000;
+			*SYS = TWO;
+			if (first && second &&
+				(next & 0b1100'0000) != 0b1100'0000)			// Second cannot be memory
+			{
+				if (f_size = 1)
+				{
+					if (*second != 0)
+					{
+						if (right)
+						{
+							*first >>= (s_size == 1 ? *second : *(uint16_t*)second) - 1;
+							F->CF = *first & 0b0001;
+							*first >>= 1;
+						}
+						else
+						{
+							*first <<= (s_size == 1 ? *second : *(uint16_t*)second) - 1;
+							F->CF = *first & sign8;
+							*first <<= 1;
+						}
+					}
+					SET_FLAGS_8(first);
+				}
+				else
+				{
+					if (*(uint16_t*)second != 0)
+					{
+						if (right)
+						{
+							*(uint16_t*)first >>= (s_size == 1 ? *second : *(uint16_t*)second) - 1;
+							F->CF = *(uint16_t*)first & 0b0001;
+							*(uint16_t*)first >>= 1;
+						}
+						else
+						{
+							*(uint16_t*)first <<= (s_size == 1 ? *second : *(uint16_t*)second) - 1;
+							F->CF = *(uint16_t*)first & sign16;
+							*(uint16_t*)first <<= 1;
+						}
+					}
+					SET_FLAGS_16(first);
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x11: // SAL / SAR
+		{
+			bool right = (next & 0b0010'0000) == 0b0000'0000; // SAR or SAL
+			next |= 0b0010'0000;
+			*SYS = TWO;
+			if (first && second &&
+				(next & 0b1100'0000) != 0b1100'0000)			// Second cannot be memory
+			{
+				if (f_size = 1)
+				{
+					if (*second != 0)
+					{
+						if (right)
+						{
+							// Implementation-dependent, works with Microsoft compiler
+							*(int8_t*)first >>= (s_size == 1 ? *second : *(uint16_t*)second) - 1;
+							F->CF = *first & 0b0001;
+							*(int8_t*)first >>= 1;
+						}
+						else
+						{
+							*first <<= (s_size == 1 ? *second : *(uint16_t*)second) - 1;
+							F->CF = *first & sign8;
+							*first <<= 1;
+						}
+					}
+					SET_FLAGS_8(first);
+				}
+				else
+				{
+					if (*(uint16_t*)second != 0)
+					{
+						if (right)
+						{
+							// Implementation-dependent, works with Microsoft compiler
+							*(int16_t*)first >>= (s_size == 1 ? *second : *(uint16_t*)second) - 1;
+							F->CF = *(uint16_t*)first & 0b0001;
+							*(int16_t*)first >>= 1;
+						}
+						else
+						{
+							*(uint16_t*)first <<= (s_size == 1 ? *second : *(uint16_t*)second) - 1;
+							F->CF = *(uint16_t*)first & sign16;
+							*(uint16_t*)first <<= 1;
+						}
+					}
+					SET_FLAGS_16(first);
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x12: // ROL / ROR
+		{
+			bool right = (next & 0b0010'0000) == 0b0000'0000; // ROR or ROL
+			next |= 0b0010'0000;
+			*SYS = TWO;
+			if (first && second &&
+				(next & 0b1100'0000) != 0b1100'0000)			// Second cannot be memory
+			{
+				uint16_t s = (s_size == 1 ? *second : *(uint16_t*)second);
+				if (f_size = 1)
+				{
+					if (*second != 0)
+					{
+						if (right)
+						{
+							for (int i = 0; i < s; i++)
+							{
+								F->CF = *first & 0b0001;
+								*first >>= 1;
+								if (F->CF)
+								{
+									*first |= sign8;
+								}
+							}
+						}
+						else
+						{
+							for (int i = 0; i < s; i++)
+							{
+								F->CF = *first & sign8;
+								*first <<= 1;
+								if (F->CF)
+								{
+									*first |= 0b0001;
+								}
+							}
+						}
+					}
+					SET_FLAGS_8(first);
+				}
+				else
+				{
+					if (*second != 0)
+					{
+						if (right)
+						{
+							for (int i = 0; i < s; i++)
+							{
+								F->CF = *(uint16_t*)first & 0b0001;
+								*(uint16_t*)first >>= 1;
+								if (F->CF)
+								{
+									*(uint16_t*)first |= sign16;
+								}
+							}
+						}
+						else
+						{
+							for (int i = 0; i < s; i++)
+							{
+								F->CF = *(uint16_t*)first & sign16;
+								*(uint16_t*)first <<= 1;
+								if (F->CF)
+								{
+									*(uint16_t*)first |= 0b0001;
+								}
+							}
+						}
+					}
+					SET_FLAGS_16(first);
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
+		case 0x13: // RCL / RCR
+		{
+			bool right = (next & 0b0010'0000) == 0b0000'0000; // RCR or RCL
+			next |= 0b0010'0000;
+			*SYS = TWO;
+			if (first && second &&
+				(next & 0b1100'0000) != 0b1100'0000)			// Second cannot be memory
+			{
+				uint16_t s = (s_size == 1 ? *second : *(uint16_t*)second);
+				if (f_size = 1)
+				{
+					if (*second != 0)
+					{
+						if (right)
+						{
+							for (int i = 0; i < s; i++)
+							{
+								bool tmp = F->CF;
+								F->CF = *first & 0b0001;
+								*first >>= 1;
+								if (tmp)
+								{
+									*first |= sign8;
+								}
+							}
+						}
+						else
+						{
+							for (int i = 0; i < s; i++)
+							{
+								bool tmp = F->CF;
+								F->CF = *first & sign8;
+								*first <<= 1;
+								if (tmp)
+								{
+									*first |= 0b0001;
+								}
+							}
+						}
+					}
+					SET_FLAGS_8(first);
+				}
+				else
+				{
+					if (*second != 0)
+					{
+						if (right)
+						{
+							for (int i = 0; i < s; i++)
+							{
+								bool tmp = F->CF;
+								F->CF = *(uint16_t*)first & 0b0001;
+								*(uint16_t*)first >>= 1;
+								if (tmp)
+								{
+									*(uint16_t*)first |= sign16;
+								}
+							}
+						}
+						else
+						{
+							for (int i = 0; i < s; i++)
+							{
+								bool tmp = F->CF;
+								F->CF = *(uint16_t*)first & sign16;
+								*(uint16_t*)first <<= 1;
+								if (tmp)
+								{
+									*(uint16_t*)first |= 0b0001;
+								}
+							}
+						}
+					}
+					SET_FLAGS_16(first);
+				}
+			}
+			else
+			{
+				INVALID_INSTRUCTION;
+			}
+			*IP = *SYS;
+			break;
+		}
 		}
 	}
 }
